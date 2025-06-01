@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Palavras Cruzadas: Arquitetura em Camadas</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    .crossword-cell input {
+      width: 100%;
+      height: 100%;
+      text-align: center;
+      font-size: 1.25rem;
+      font-weight: bold;
+      text-transform: uppercase;
+      background-color: transparent;
+      border: none;
+      outline: none;
+      padding: 0;
+      margin: 0;
+      border-radius: 0.375rem;
+    }
+    .crossword-cell.correct input { background-color: #d1fae5; }
+    .crossword-cell.incorrect input { background-color: #fee2e2; }
+    .crossword-cell.empty {
+      background-color: #e5e7eb;
+      cursor: not-allowed;
+    }
+    .crossword-cell.empty input { pointer-events: none; }
+    .crossword-grid {
+      display: grid;
+      grid-template-columns: repeat(var(--grid-cols), 1fr);
+      grid-auto-rows: 1fr;
+    }
+    /* Removed max-height and overflow-y from .clues-section to prevent scrolling */
+    .clues-section {
+      /* overflow-y: auto; */
+      /* max-height: 400px; */
+    }
+  </style>
+</head>
+<body class="bg-gradient-to-br from-blue-100 to-purple-100 min-h-screen flex items-center justify-center p-4 font-sans">
+  <div class="bg-white p-6 md:p-8 rounded-xl shadow-2xl max-w-4xl w-full flex flex-col md:flex-row gap-6">
+    <div class="w-full md:w-2/3">
+      <h1 class="text-3xl md:text-4xl font-extrabold text-center text-gray-800 mb-6">
+        Palavras Cruzadas: Arquitetura em Camadas
+      </h1>
+      <div id="crossword-grid" class="crossword-grid w-full aspect-square border-2 border-gray-400 rounded-lg overflow-hidden" style="--grid-cols: 13;"></div>
+      <div class="flex flex-col sm:flex-row justify-center gap-4 mt-6">
+        <button id="check-button" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-lg shadow-md transition transform hover:scale-105">
+          Verificar Respostas
+        </button>
+        <button id="reset-button" class="bg-red-500 hover:bg-red-600 text-white font-bold py-3 px-6 rounded-lg shadow-md transition transform hover:scale-105">
+          Reiniciar Jogo
+        </button>
+      </div>
+      <div id="message-area" class="mt-6 text-center text-lg font-semibold min-h-[30px]"></div>
+    </div>
+    <div class="w-full md:w-1/3 bg-gray-50 p-5 rounded-lg shadow-inner clues-section">
+      <h2 class="text-2xl font-bold text-gray-700 mb-4">Dicas</h2>
+      <div class="mb-6">
+        <h3 class="text-xl font-semibold text-gray-600 mb-2">Verticais</h3>
+        <ul id="clues-down" class="list-disc list-inside text-gray-700 space-y-1"></ul>
+      </div>
+      <div>
+        <h3 class="text-xl font-semibold text-gray-600 mb-2">Horizontais</h3>
+        <ul id="clues-across" class="list-disc list-inside text-gray-700 space-y-1"></ul>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const crosswordData = {
+      words: [
+        { word: "PERSISTENCIA", clue: "Camada responsável pelo acesso e manipulação de dados.", direction: "across", startx: 0, starty: 2, number: 3 },
+        { word: "APLICACAO", clue: "Camada que contém a lógica de negócios.", direction: "across", startx: 11, starty: 4, number: 4 },
+        { word: "APRESENTACAO", clue: "Camada responsável pela interface do usuário.", direction: "across", startx: 0, starty: 8, number: 5 },
+        { word: "BANCODEDADOS", clue: "Camada onde os dados são armazenados e gerenciados.", direction: "down", startx: 8, starty: 0, number: 1 },
+        { word: "CAMADA", clue: "Uma divisão lógica em uma arquitetura de software.", direction: "down", startx: 11, starty: 1, number: 2 }
+      ],
+      gridSize: { rows: 12, cols: 20 }
+    };
+
+    let gridInputs = [];
+
+    function generateCrosswordGrid() {
+      const crosswordGrid = document.getElementById('crossword-grid');
+      crosswordGrid.innerHTML = '';
+      crosswordGrid.style.setProperty('--grid-cols', crosswordData.gridSize.cols);
+
+      gridInputs = Array.from({ length: crosswordData.gridSize.rows }, () => Array(crosswordData.gridSize.cols).fill(null));
+
+      for (let r = 0; r < crosswordData.gridSize.rows; r++) {
+        for (let c = 0; c < crosswordData.gridSize.cols; c++) {
+          const cell = document.createElement('div');
+          cell.className = 'crossword-cell relative w-full h-full flex items-center justify-center border border-gray-300 bg-gray-100 empty';
+          crosswordGrid.appendChild(cell);
+        }
+      }
+
+      crosswordData.words.forEach(wordObj => {
+        const { word, startx, starty, direction, number } = wordObj;
+        for (let i = 0; i < word.length; i++) {
+          const r = direction === "across" ? starty : starty + i;
+          const c = direction === "across" ? startx + i : startx;
+          const idx = r * crosswordData.gridSize.cols + c;
+          const cell = crosswordGrid.children[idx];
+          cell.classList.remove('empty', 'bg-gray-100');
+          cell.classList.add('bg-white');
+
+          if (!cell.querySelector('input')) {
+            const input = document.createElement('input');
+            input.type = 'text';
+            input.maxLength = 1;
+            input.dataset.row = r;
+            input.dataset.col = c;
+            input.dataset.correctLetter = word[i];
+            input.addEventListener('input', e => {
+              if (e.target.value.length === 1) focusNextInput(r, c);
+            });
+            cell.appendChild(input);
+            gridInputs[r][c] = input;
+          }
+
+          if (i === 0) {
+            const numSpan = document.createElement('span');
+            numSpan.className = 'absolute top-0 left-0 text-xs font-semibold text-gray-600 p-0.5';
+            numSpan.textContent = number;
+            cell.appendChild(numSpan);
+          }
+        }
+      });
+
+      displayClues();
+    }
+
+    function focusNextInput(currentRow, currentCol) {
+      for (let r = currentRow; r < gridInputs.length; r++) {
+        for (let c = r === currentRow ? currentCol + 1 : 0; c < gridInputs[0].length; c++) {
+          if (gridInputs[r][c]) {
+            gridInputs[r][c].focus();
+            return;
+          }
+        }
+      }
+    }
+
+    function displayClues() {
+      const acrossList = document.getElementById('clues-across');
+      const downList = document.getElementById('clues-down');
+      acrossList.innerHTML = '';
+      downList.innerHTML = '';
+
+      // Populate vertical clues first
+      crosswordData.words.filter(w => w.direction === 'down').sort((a, b) => a.number - b.number).forEach(w => {
+        const li = document.createElement('li');
+        li.textContent = `${w.number}. ${w.clue}`;
+        downList.appendChild(li);
+      });
+
+      // Then populate horizontal clues
+      crosswordData.words.filter(w => w.direction === 'across').sort((a, b) => a.number - b.number).forEach(w => {
+        const li = document.createElement('li');
+        li.textContent = `${w.number}. ${w.clue}`;
+        acrossList.appendChild(li);
+      });
+    }
+
+    function checkAnswers() {
+      let allCorrect = true;
+      crosswordData.words.forEach(({ word, startx, starty, direction }) => {
+        for (let i = 0; i < word.length; i++) {
+          const r = direction === "across" ? starty : starty + i;
+          const c = direction === "across" ? startx + i : startx;
+          const input = gridInputs[r][c];
+          const cell = input.closest('.crossword-cell');
+          cell.classList.remove('correct', 'incorrect');
+          if (input.value.toUpperCase() === word[i]) {
+            cell.classList.add('correct');
+          } else {
+            cell.classList.add('incorrect');
+            allCorrect = false;
+          }
+        }
+      });
+      const message = document.getElementById('message-area');
+      if (allCorrect) {
+        message.textContent = "Parabéns! Você completou o quebra-cabeça!";
+        message.className = 'text-green-600';
+      } else {
+        message.textContent = "Algumas respostas estão incorretas. Tente novamente!";
+        message.className = 'text-red-600';
+      }
+    }
+
+    function resetPuzzle() {
+      gridInputs.flat().forEach(input => {
+        if (input) {
+          input.value = '';
+          const cell = input.closest('.crossword-cell');
+          cell.classList.remove('correct', 'incorrect');
+        }
+      });
+      const message = document.getElementById('message-area');
+      message.textContent = '';
+      message.className = '';
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+      generateCrosswordGrid();
+      document.getElementById('check-button').addEventListener('click', checkAnswers);
+      document.getElementById('reset-button').addEventListener('click', resetPuzzle);
+    });
+  </script>
+</body>
+</html>
